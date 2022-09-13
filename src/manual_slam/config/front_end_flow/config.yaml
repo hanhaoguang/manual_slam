@@ -1,0 +1,12 @@
+  # Topics
+  lidar_topic: "/kitti/velo/pointcloud"
+  imu_topic: "/kitti/oxts/imu"                         
+  gnss_topic: "/kitti/oxts/gps/fix"
+
+
+
+  # 标定参数
+  lidar_to_imu: [1,           0,           0,           0,
+                 0,           1,           0,           0,
+                 0,           0,           1,           0,
+                 0,           0,           0,           1]

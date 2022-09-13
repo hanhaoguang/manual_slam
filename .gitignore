@@ -1,0 +1,5 @@
+.vscode
+build
+devel
+src/manual_slam/Log
+src/manual_slam/slam_data
