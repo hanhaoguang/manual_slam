@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-10 14:47:21
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-11 14:26:19
+ * @LastEditTime: 2022-09-13 17:23:40
  * @FilePath: /slam_ws/src/manual_slam/include/front_end/front_end_flow.hpp
  * @Description: front end 任务管理， 放在类里使代码更清晰
  * 
@@ -16,6 +16,7 @@
 #include "subscriber/cloud_subscriber.hpp"
 #include "subscriber/imu_subscriber.hpp"
 #include "subscriber/gnss_subscriber.hpp"
+#include "subscriber/velocity_subscriber.hpp"
 // #include "tf_listener/tf_listener.hpp"
 #include "publisher/cloud_publisher.hpp"
 #include "publisher/odometry_publisher.hpp"
@@ -41,10 +42,11 @@ class FrontEndFlow {
     bool UpdateGNSSOdometry();
     bool UpdateLaserOdometry();
     bool PublishData();
-
+    bool SaveTrajectory();
   private:
     std::shared_ptr<CloudSubscriber> cloud_sub_ptr_;
     std::shared_ptr<IMUSubscriber> imu_sub_ptr_;
+    std::shared_ptr<VelocitySubscriber> velocity_sub_ptr_;
     std::shared_ptr<GNSSSubscriber> gnss_sub_ptr_;
     // std::shared_ptr<TFListener> lidar_to_imu_ptr_;
     std::shared_ptr<CloudPublisher> cloud_pub_ptr_;
@@ -56,11 +58,18 @@ class FrontEndFlow {
 
     std::deque<CloudData> cloud_data_buff_;
     std::deque<IMUData> imu_data_buff_;
+    std::deque<VelocityData> velocity_data_buff_;
     std::deque<GNSSData> gnss_data_buff_;
+
+    std::deque<IMUData> unsynced_imu_;
+    std::deque<VelocityData> unsynced_velocity_;
+    std::deque<GNSSData> unsynced_gnss_;
+    
     Eigen::Matrix4f lidar_to_imu_ = Eigen::Matrix4f::Identity();
     CloudData current_cloud_data_;
     IMUData current_imu_data_;
     GNSSData current_gnss_data_;
+    VelocityData current_velocity_data_;
 
     CloudData::CLOUD_PTR local_map_ptr_;
     CloudData::CLOUD_PTR global_map_ptr_;
@@ -71,6 +80,7 @@ class FrontEndFlow {
     std::string lidar_topic_;
     std::string imu_topic_;
     std::string gnss_topic_;
+    std::string velocity_topic_;
     YAML::Node config_node_;
     std::string config_file_path_ = WORK_SPACE_PATH + "/config/front_end_flow/config.yaml";
     

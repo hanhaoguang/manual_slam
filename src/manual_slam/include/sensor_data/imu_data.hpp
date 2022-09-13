@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-06 17:27:35
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-11 17:03:09
+ * @LastEditTime: 2022-09-13 16:58:54
  * @FilePath: /slam_ws/src/manual_slam/include/sensor_data/imu_data.hpp
  * @Description: imu自定数据格式，带一个四元数转旋转矩阵的方法
  * 
@@ -27,11 +27,21 @@ class IMUData {
       double z = 0.0;
     };
     
-    struct Orientation {
-      double x = 0.0;
-      double y = 0.0;
-      double z = 0.0;
-      double w = 0.0;
+    class Orientation {
+      public:
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        double w = 0.0;
+      
+      public:
+        void Normlize() {
+          double norm = sqrt(pow(x, 2.0) + pow(y, 2.0) + pow(z, 2.0) + pow(w, 2.0));
+          x /= norm;
+          y /= norm;
+          z /= norm;
+          w /= norm;
+        }
     };
 
     double time = 0.0;
@@ -41,11 +51,8 @@ class IMUData {
   
   public:
     // 把四元数转换成旋转矩阵送出去
-    Eigen::Matrix3f GetOrientationMatrix() {
-      Eigen::Quaterniond q(orientation.w, orientation.x, orientation.y, orientation.z);
-      Eigen::Matrix3f matrix = q.matrix().cast<float>();
+    Eigen::Matrix3f GetOrientationMatrix();
+    static bool SyncData(std::deque<IMUData>& UnsyncedData, std::deque<IMUData>& SyncedData, double sync_time);
 
-      return matrix;
-    }
 };
 }

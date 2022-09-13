@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-06 19:25:51
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-06 19:49:46
+ * @LastEditTime: 2022-09-13 16:55:58
  * @FilePath: /slam_ws/src/manual_slam/include/sensor_data/gnss_data.hpp
  * @Description: gnss数据,时间经纬高enu，没有方差
  * 
@@ -12,7 +12,7 @@
 #pragma once
 #include <vector>
 #include <string>
-
+#include <deque>
 #include "Geocentric/LocalCartesian.hpp"
 
 using std::vector;
@@ -38,5 +38,7 @@ class GNSSData {
   public: 
     void InitOriginPosition();
     void UpdateXYZ();
+    static bool SyncData(std::deque<GNSSData>& UnsyncedData, std::deque<GNSSData>& SyncedData, double sync_time);
+
 };
 }

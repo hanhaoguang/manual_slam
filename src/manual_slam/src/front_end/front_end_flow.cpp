@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-10 14:50:42
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-11 15:35:18
+ * @LastEditTime: 2022-09-13 17:30:11
  * @FilePath: /slam_ws/src/manual_slam/src/front_end/front_end_flow.cpp
  * @Description: 控制订阅和发布,更新gnss里程计和lidar里程计
  * 
@@ -11,6 +11,7 @@
 
 #include "front_end/front_end_flow.hpp"
 #include "glog/logging.h"
+#include "tools/file_manager.hpp"
 
 namespace lidar_localization {
 FrontEndFlow::FrontEndFlow(ros::NodeHandle& nh) {
@@ -31,6 +32,7 @@ FrontEndFlow::FrontEndFlow(ros::NodeHandle& nh) {
 
     cloud_sub_ptr_ = std::make_shared<CloudSubscriber>(nh, lidar_topic_, 100000);
     imu_sub_ptr_ = std::make_shared<IMUSubscriber>(nh, imu_topic_, 1000000);
+    velocity_sub_ptr_ = std::make_shared<VelocitySubscriber>(nh, velocity_topic_, 1000000);
     gnss_sub_ptr_ = std::make_shared<GNSSSubscriber>(nh, gnss_topic_, 1000000);
 }
 
@@ -42,6 +44,8 @@ bool FrontEndFlow::InitWithConfig() {
     LOG(INFO) << "imu话题" << imu_topic_;
     gnss_topic_ = config_node_["gnss_topic"].as<std::string>();
     LOG(INFO) << "gnss话题" << gnss_topic_;
+    velocity_topic_ = config_node_["velocity_topic"].as<std::string>();
+    LOG(INFO) << "速度话题" << gnss_topic_;
     std::vector<float> lidar_to_imu_v = config_node_["lidar_to_imu"].as<std::vector<float>>();
 
     lidar_to_imu_ = Eigen::Map<const Eigen::Matrix<float, -1, -1, Eigen::RowMajor>>(lidar_to_imu_v.data(), 4, 4); 
@@ -53,7 +57,8 @@ bool FrontEndFlow::InitWithConfig() {
 bool FrontEndFlow::Run() {
     LOG(INFO) << "erererererer";
 
-    ReadData();
+    if (!ReadData())
+        return false;
     LOG(INFO) << "0000000000";
 
     // if (!InitCalibration()) 
@@ -69,7 +74,6 @@ bool FrontEndFlow::Run() {
     LOG(INFO) << "222222222222222";
 
         UpdateGNSSOdometry();
-        InitFrontEnd();
     LOG(INFO) << "333333333333333333";
 
         if (UpdateLaserOdometry())
@@ -84,10 +88,30 @@ bool FrontEndFlow::Run() {
 }
 
 bool FrontEndFlow::ReadData() {
-    cloud_sub_ptr_->ParseData(cloud_data_buff_);
-    imu_sub_ptr_->ParseData(imu_data_buff_);
-    gnss_sub_ptr_->ParseData(gnss_data_buff_);
+    // cloud_sub_ptr_->ParseData(cloud_data_buff_);
+    // imu_sub_ptr_->ParseData(imu_data_buff_);
+    // gnss_sub_ptr_->ParseData(gnss_data_buff_);
 
+
+    imu_sub_ptr_->ParseData(unsynced_imu_);
+    velocity_sub_ptr_->ParseData(unsynced_velocity_);
+    gnss_sub_ptr_->ParseData(unsynced_gnss_);
+
+    if (cloud_data_buff_.size() == 0)
+        return false;
+
+    double cloud_time = cloud_data_buff_.front().time;
+    bool valid_imu = IMUData::SyncData(unsynced_imu_, imu_data_buff_, cloud_time);
+    bool valid_velocity = VelocityData::SyncData(unsynced_velocity_, velocity_data_buff_, cloud_time);
+    bool valid_gnss = GNSSData::SyncData(unsynced_gnss_, gnss_data_buff_, cloud_time);
+    static bool sensor_inited = false;
+    if (!sensor_inited) {
+        if (!valid_imu || !valid_velocity || !valid_gnss) {
+            cloud_data_buff_.pop_front();
+            return false;
+        }
+        sensor_inited = true;
+    }
     return true;
 }
 
@@ -130,7 +154,8 @@ bool FrontEndFlow::HasData() {
         return false;
     if (gnss_data_buff_.size() == 0)
         return false;
-    
+    if (velocity_data_buff_.size() == 0)
+        return false;
     return true;
 }
 
@@ -138,6 +163,7 @@ bool FrontEndFlow::ValidData() {
     current_cloud_data_ = cloud_data_buff_.front();
     current_imu_data_ = imu_data_buff_.front();
     current_gnss_data_ = gnss_data_buff_.front();
+    current_velocity_data_ = velocity_data_buff_.front();
 
     double d_time = current_cloud_data_.time - current_imu_data_.time;
     if (d_time < -0.05) {
@@ -147,12 +173,14 @@ bool FrontEndFlow::ValidData() {
 
     if (d_time > 0.05) {
         imu_data_buff_.pop_front();
+        velocity_data_buff_.pop_front();
         gnss_data_buff_.pop_front();
         return false;
     }
 
     cloud_data_buff_.pop_front();
     imu_data_buff_.pop_front();
+    velocity_data_buff_.pop_front();
     gnss_data_buff_.pop_front();
 
     return true;
@@ -175,13 +203,19 @@ bool FrontEndFlow::UpdateGNSSOdometry() {
 }
 
 bool FrontEndFlow::UpdateLaserOdometry() {
-
+// todo
 
     laser_odometry_ = Eigen::Matrix4f::Identity();
+    static bool front_end_pose_inited = false;
+    if (!front_end_pose_inited) {
+        front_end_pose_inited = true;
+        InitFrontEnd();
+    }
+
+
     if (front_end_ptr_->Update(current_cloud_data_, laser_odometry_))
     {
         return true;
-
     }
     else 
         return false;
@@ -209,6 +243,36 @@ bool FrontEndFlow::PublishGlobalMap() {
         global_map_pub_ptr_->Publish(global_map_ptr_);
         global_map_ptr_.reset(new CloudData::CLOUD());
     }
+    return true;
+}
+
+bool FrontEndFlow::SaveTrajectory() {
+    static std::ofstream ground_truth, laser_odom;
+    static bool is_file_created = false;
+    if (!is_file_created) {
+        if (!FileManager::CreateDirectory(WORK_SPACE_PATH + "/slam_data/trajectory"))
+            return false;
+        if (!FileManager::CreateFile(ground_truth, WORK_SPACE_PATH + "/slam_data/trajectory/ground_truth.txt"))
+            return false;
+        if (!FileManager::CreateFile(laser_odom, WORK_SPACE_PATH + "/slam_data/trajectory/laser_odom.txt"))
+            return false;
+        is_file_created = true;
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            ground_truth << gnss_odometry_(i, j);
+            laser_odom << laser_odometry_(i, j);
+            if (i == 2 && j == 3) {
+                ground_truth << std::endl;
+                laser_odom << std::endl;
+            } else {
+                ground_truth << " ";
+                laser_odom << " ";
+            }
+        }
+    }
+
     return true;
 }
 }
