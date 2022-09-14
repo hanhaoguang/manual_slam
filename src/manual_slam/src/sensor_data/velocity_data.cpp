@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-13 17:00:06
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-13 17:00:17
+ * @LastEditTime: 2022-09-14 11:22:59
  * @FilePath: /slam_ws/src/manual_slam/src/sensor_data/velocity_data.cpp
  * @Description: 
  * 
@@ -69,7 +69,7 @@ void VelocityData::TransformCoordinate(Eigen::Matrix4f transform_matrix) {
     Eigen::Vector3d delta_v;
     delta_v(0) = w(1) * r(2) - w(2) * r(1);
     delta_v(1) = w(2) * r(0) - w(0) * r(2);
-    delta_v(2) = w(1) * r(1) - w(1) * r(0);
+    delta_v(2) = w(0) * r(1) - w(1) * r(0);
     v = v + delta_v;
 
     angular_velocity.x = w(0);

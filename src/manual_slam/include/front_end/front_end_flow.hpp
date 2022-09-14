@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-10 14:47:21
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-13 17:23:40
+ * @LastEditTime: 2022-09-14 11:39:16
  * @FilePath: /slam_ws/src/manual_slam/include/front_end/front_end_flow.hpp
  * @Description: front end 任务管理， 放在类里使代码更清晰
  * 
@@ -21,6 +21,7 @@
 #include "publisher/cloud_publisher.hpp"
 #include "publisher/odometry_publisher.hpp"
 #include "front_end/front_end.hpp"
+#include "models/scan_adjust/distortion_adjust.hpp"
 
 namespace lidar_localization {
 class FrontEndFlow {
@@ -55,6 +56,7 @@ class FrontEndFlow {
     std::shared_ptr<OdometryPublisher> laser_odom_pub_ptr_;
     std::shared_ptr<OdometryPublisher> gnss_pub_ptr_;
     std::shared_ptr<FrontEnd> front_end_ptr_;
+    std::shared_ptr<DistortionAdjust> distortion_adjust_ptr_;
 
     std::deque<CloudData> cloud_data_buff_;
     std::deque<IMUData> imu_data_buff_;

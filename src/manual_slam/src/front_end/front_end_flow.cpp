@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-10 14:50:42
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-13 17:30:11
+ * @LastEditTime: 2022-09-14 14:13:24
  * @FilePath: /slam_ws/src/manual_slam/src/front_end/front_end_flow.cpp
  * @Description: 控制订阅和发布,更新gnss里程计和lidar里程计
  * 
@@ -21,12 +21,14 @@ FrontEndFlow::FrontEndFlow(ros::NodeHandle& nh) {
     current_scan_ptr_.reset(new CloudData::CLOUD());
     // lidar_to_imu_ptr_ = std::make_shared<TFListener>(nh, "velo_link", "imu_link");
 
-    cloud_pub_ptr_ = std::make_shared<CloudPublisher>(nh, "current_scan", 100, "/map");
-    local_map_pub_ptr_ = std::make_shared<CloudPublisher>(nh, "local_map", 100, "/map");
-    global_map_pub_ptr_ = std::make_shared<CloudPublisher>(nh, "global_map", 100, "/map");
+    cloud_pub_ptr_ = std::make_shared<CloudPublisher>(nh, "current_scan", 100, "map");
+    local_map_pub_ptr_ = std::make_shared<CloudPublisher>(nh, "local_map", 100, "map");
+    global_map_pub_ptr_ = std::make_shared<CloudPublisher>(nh, "global_map", 100, "map");
     laser_odom_pub_ptr_ = std::make_shared<OdometryPublisher>(nh, "laser_odom", "map", "lidar", 100);
     gnss_pub_ptr_ = std::make_shared<OdometryPublisher>(nh, "gnss", "map", "lidar", 100);
     front_end_ptr_ = std::make_shared<FrontEnd>();
+    distortion_adjust_ptr_ = std::make_shared<DistortionAdjust>();
+
     usleep(5000);
     InitWithConfig();  
 
@@ -64,15 +66,15 @@ bool FrontEndFlow::Run() {
     // if (!InitCalibration()) 
     //     return false;
 
-    if (!InitGNSS())
-        return false;
+
     LOG(INFO) << "111111111111111";
 
     while(HasData()) {
         if (!ValidData())
             continue;
     LOG(INFO) << "222222222222222";
-
+        if (!InitGNSS())
+            return false;
         UpdateGNSSOdometry();
     LOG(INFO) << "333333333333333333";
 
@@ -88,7 +90,7 @@ bool FrontEndFlow::Run() {
 }
 
 bool FrontEndFlow::ReadData() {
-    // cloud_sub_ptr_->ParseData(cloud_data_buff_);
+    cloud_sub_ptr_->ParseData(cloud_data_buff_);
     // imu_sub_ptr_->ParseData(imu_data_buff_);
     // gnss_sub_ptr_->ParseData(gnss_data_buff_);
 
@@ -128,8 +130,9 @@ bool FrontEndFlow::ReadData() {
 
 bool FrontEndFlow::InitGNSS() {
     static bool gnss_inited = false;
-    if (!gnss_inited && gnss_data_buff_.size() > 0) {
-        GNSSData gnss_data = gnss_data_buff_.front();
+    LOG(INFO) << gnss_data_buff_.size();
+    if (!gnss_inited) {
+        GNSSData gnss_data = current_gnss_data_;
         gnss_data.InitOriginPosition();
         gnss_inited = true;
     }
@@ -204,6 +207,9 @@ bool FrontEndFlow::UpdateGNSSOdometry() {
 
 bool FrontEndFlow::UpdateLaserOdometry() {
 // todo
+    current_velocity_data_.TransformCoordinate(lidar_to_imu_.inverse());
+    distortion_adjust_ptr_->SetMotionInfo(0.1, current_velocity_data_);
+    distortion_adjust_ptr_->AdjustCloud(current_cloud_data_.cloud_ptr, current_cloud_data_.cloud_ptr);
 
     laser_odometry_ = Eigen::Matrix4f::Identity();
     static bool front_end_pose_inited = false;
@@ -213,12 +219,8 @@ bool FrontEndFlow::UpdateLaserOdometry() {
     }
 
 
-    if (front_end_ptr_->Update(current_cloud_data_, laser_odometry_))
-    {
-        return true;
-    }
-    else 
-        return false;
+    return front_end_ptr_->Update(current_cloud_data_, laser_odometry_);
+
 }
 
 bool FrontEndFlow::PublishData() {

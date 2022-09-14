@@ -2,7 +2,7 @@
  * @Author: hhg
  * @Date: 2022-09-09 16:42:24
  * @LastEditors: hhg
- * @LastEditTime: 2022-09-11 17:02:02
+ * @LastEditTime: 2022-09-14 11:47:06
  * @FilePath: /slam_ws/src/manual_slam/include/global_def.hpp
  * @Description: 
  * 
@@ -37,6 +37,6 @@
 #include <pcl/filters/conditional_removal.h>
 
 namespace lidar_localization {
-const std::string WORK_SPACE_PATH = "/media/hhg/hhg/slam_ws/src/manual_slam";
+const std::string WORK_SPACE_PATH = "/home/hhg/project/slam_ws/src/manual_slam";
 }
 #endif

@@ -2,7 +2,7 @@
   lidar_topic: "/kitti/velo/pointcloud"
   imu_topic: "/kitti/oxts/imu"                         
   gnss_topic: "/kitti/oxts/gps/fix"
-
+  velocity_topic: "/kitti/oxts/gps/vel"
 
 
   # 标定参数
